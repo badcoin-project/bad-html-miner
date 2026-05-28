@@ -104,9 +104,9 @@ For real mining, run the BadCoin Core wallet's Mining tab or a dedicated CPU min
 
 ## How to host on GitHub
 
-Same pattern as the vanity generator:
+This repo lives at [`badcoin-project/bad-html-miner`](https://github.com/badcoin-project/bad-html-miner). Two delivery paths from here:
 
-1. **GitHub Pages.** Push `BAD_Coin_Miner.html` (renamed to `index.html` at the repo root, or kept as-is and linked directly) to a repo (e.g. `badcoin-project/web-miner`), enable Pages on `main`, share the URL.
+1. **GitHub Pages.** `BAD_Coin_Miner.html` can be served directly (or renamed to `index.html` at the root); enable Pages on `main` to share a URL.
 2. **Downloadable release.** Attach the single `BAD_Coin_Miner.html` to a GitHub Release. Users download and run offline.
 
 The downloadable path is more security-conscious; the user can verify the file's hash, then run it forever without depending on any remote server.
@@ -118,6 +118,16 @@ The downloadable path is more security-conscious; the user can verify the file's
 
 ## Provenance
 
-Built for the BadCoin community by Tom Friend. Companion to the BadCoin Vanity Address Generator (`~/Desktop/Bad_HTML_Vanity/`), the BadCoin Core wallet (`badcoin-project/badcoin`), and the iOS wallet (`badcoin-project/badcoin-mobile-wallet`).
+Built for the BadCoin community by Tom Friend. Companion to:
+
+- [`badcoin-project/bad-html-vanity`](https://github.com/badcoin-project/bad-html-vanity) — vanity BAD-address generator (same single-file browser tool philosophy)
+- [`badcoin-project/badcoin`](https://github.com/badcoin-project/badcoin) — BadCoin Core wallet + node
+- [`badcoin-project/badcoin-mobile-wallet`](https://github.com/badcoin-project/badcoin-mobile-wallet) — iOS wallet (private during testing)
+
+Pixel-art mining animation by Joel.
 
 Single-file HTML so you can save it, audit it, and run it forever even if the source repo disappears.
+
+## License
+
+MIT. See `LICENSE`.
