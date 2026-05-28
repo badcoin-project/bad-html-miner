@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>yescrypt-WASM Test Page</title>
+<style>
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    max-width: 720px;
+    margin: 2rem auto;
+    padding: 0 1rem;
+    color: #0b0b0b;
+    line-height: 1.5;
+  }
+  h1 { color: #1e3a5f; }
+  .status {
+    padding: 1rem 1.25rem;
+    border-radius: 8px;
+    margin: 1rem 0;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 0.95rem;
+    border-left: 4px solid;
+  }
+  .status.idle   { background: #f1f5f9; border-color: #64748b; }
+  .status.work   { background: #dbeafe; border-color: #1e3a8a; color: #1e3a8a; }
+  .status.ok     { background: #e6f4ee; border-color: #047857; color: #047857; }
+  .status.error  { background: #fee2e2; border-color: #b91c1c; color: #b91c1c; }
+  pre {
+    background: #f1f5f9;
+    border: 1px solid #cbd5e1;
+    border-radius: 6px;
+    padding: 0.75rem 1rem;
+    font-size: 0.85rem;
+    overflow-x: auto;
+  }
+  button {
+    background: #1e3a5f;
+    color: white;
+    border: none;
+    padding: 0.6rem 1.4rem;
+    border-radius: 6px;
+    font-size: 0.95rem;
+    font-weight: 600;
+    cursor: pointer;
+    margin-right: 0.5rem;
+  }
+  button:hover:not(:disabled) { background: #122947; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .small { font-size: 0.85rem; color: #64748b; }
+</style>
+</head>
+<body>
+
+<h1>yescrypt-WASM Test Page</h1>
+<p class="small">
+  Verifies that the Emscripten build of BadCoin's yescrypt source loads in a browser
+  and produces hashes. Use this as the smoke test after running <code>build-yescrypt-wasm.sh</code>.
+</p>
+
+<div id="status" class="status idle">Idle. Click "Load + benchmark" to start.</div>
+
+<div>
+  <button id="btnBench" onclick="runBench(100)">Load + benchmark (100 hashes)</button>
+  <button id="btnBench1000" onclick="runBench(1000)" disabled>Bench 1,000 hashes</button>
+  <button id="btnReset" onclick="reset()">Reset</button>
+</div>
+
+<h3>Output</h3>
+<pre id="output">(nothing yet)</pre>
+
+<h3>How to read the result</h3>
+<ul>
+  <li><strong>Rate &gt; 5 H/s and a stable hash hex:</strong> WASM is working. You can move to Turn 3 of the build plan (wire WASM into the miner).</li>
+  <li><strong>Rate &lt; 1 H/s:</strong> WASM loaded but is doing something pathological. Check browser DevTools console for errors. Most likely cause: the module is being recompiled on every hash.</li>
+  <li><strong>"Failed to load WASM" or other init error:</strong> Browser cannot load the WASM. Serve via <code>python3 -m http.server</code> rather than <code>file://</code>.</li>
+  <li><strong>Hash hex is all zeros:</strong> WASM is being called but input/output is broken. Check <code>yescrypt-wrapper.js</code> for cwrap signature.</li>
+</ul>
+
+<h3>What this test does</h3>
+<p class="small">
+  Loads <code>yescrypt-inline.js</code> (preferred, single file) or <code>yescrypt.js</code>+<code>yescrypt.wasm</code>
+  (split). Initializes the module once. Allocates an 80-byte input buffer
+  and a 32-byte output buffer in WASM memory. Hashes a varied input N
+  times. Measures wall-clock rate. Displays the last hash hex.
+</p>
+
+<!-- Order matters: yescrypt-inline.js (or yescrypt.js) must come BEFORE yescrypt-wrapper.js. -->
+<script>
+  // Try the inline build first; fall back to the split build if not found.
+  const tryUrls = ['yescrypt-inline.js', 'yescrypt.js'];
+  let loadedUrl = null;
+
+  function loadScript(url) {
+    return new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = url;
+      s.onload = () => resolve(url);
+      s.onerror = () => reject(new Error('failed to load ' + url));
+      document.head.appendChild(s);
+    });
+  }
+
+  async function loadYescrypt() {
+    for (const url of tryUrls) {
+      try {
+        await loadScript(url);
+        loadedUrl = url;
+        return;
+      } catch (e) {
+        // try next
+      }
+    }
+    throw new Error('Could not load yescrypt-inline.js OR yescrypt.js. Did you run build-yescrypt-wasm.sh?');
+  }
+</script>
+<script src="yescrypt-wrapper.js"></script>
+
+<script>
+  let initialized = false;
+
+  function setStatus(text, kind) {
+    const el = document.getElementById('status');
+    el.textContent = text;
+    el.className = 'status ' + kind;
+  }
+
+  function setOutput(text) {
+    document.getElementById('output').textContent = text;
+  }
+
+  async function ensureInit() {
+    if (initialized) return;
+    setStatus('Loading WASM module...', 'work');
+    await loadYescrypt();
+    await initYescrypt();
+    initialized = true;
+    document.getElementById('btnBench1000').disabled = false;
+    setStatus('WASM module loaded from ' + loadedUrl, 'ok');
+  }
+
+  async function runBench(n) {
+    try {
+      await ensureInit();
+      setStatus('Benchmarking ' + n + ' hashes...', 'work');
+      // Defer to next tick so the status renders before the heavy loop
+      await new Promise(r => setTimeout(r, 50));
+      const result = yescryptBenchmark(n);
+      setStatus('Bench done: ' + result.rate.toFixed(1) + ' H/s', 'ok');
+      setOutput(
+        'Iterations:    ' + result.hashes + '\n' +
+        'Total time:    ' + result.ms.toFixed(1) + ' ms\n' +
+        'Rate:          ' + result.rate.toFixed(2) + ' H/s\n' +
+        'Per-hash mean: ' + (result.ms / result.hashes).toFixed(2) + ' ms\n' +
+        '\n' +
+        'Last hash (hex, 32 bytes):\n' +
+        result.lastHashHex + '\n' +
+        '\n' +
+        'WASM module:   ' + loadedUrl
+      );
+    } catch (e) {
+      setStatus('ERROR: ' + e.message, 'error');
+      setOutput(e.stack || e.message);
+    }
+  }
+
+  function reset() {
+    setStatus('Idle. Click "Load + benchmark" to start.', 'idle');
+    setOutput('(nothing yet)');
+  }
+</script>
+
+</body>
+</html>

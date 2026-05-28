@@ -1,0 +1,21 @@
+# macOS
+.DS_Store
+
+# Editor / agent local config
+.claude/
+.cursorrules
+.vscode/
+.idea/
+
+# Internal dev artifacts (kept local; do not publish)
+BACKLOG.md
+CURSOR_HANDOFF.md
+WSS_GATEWAY_REQUEST.md
+
+# Common build / dependency caches (none today; future-proofing)
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.log

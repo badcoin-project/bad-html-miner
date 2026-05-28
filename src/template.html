@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self' data: blob:; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' blob:; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src * blob: data: ws: wss:;">
+<title>BadCoin HTML Miner</title>
+<style>
+:root {
+  --bg: #ffffff;
+  --bg-soft: #f5f7fb;
+  --bg-card: #ffffff;
+  --bg-elevated: #f1f5f9;
+  --ink: #0b0b0b;
+  --ink-soft: #475569;
+  --ink-mute: #64748b;
+  --rule: #d8dee9;
+  --navy: #1e3a5f;
+  --navy-soft: #e8eef5;
+  --accent: #b91c1c;
+  --warn-bg: #fef3c7;
+  --warn-border: #f59e0b;
+  --warn-ink: #78350f;
+  --info-bg: #dbeafe;
+  --info-ink: #1e3a8a;
+  --ok: #047857;
+  --ok-soft: #e6f4ee;
+  --bad: #b91c1c;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg-soft);
+  color: var(--ink);
+  line-height: 1.5;
+  min-height: 100vh;
+  padding: 1.5rem;
+}
+.app { max-width: 1100px; margin: 0 auto; }
+
+/* Header */
+.header {
+  background: var(--bg-card);
+  border: 1px solid var(--rule);
+  border-radius: 12px;
+  padding: 1.5rem 2rem;
+  margin-bottom: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+.header img.coin { width: 64px; height: 64px; }
+.header-text { flex: 1; }
+.header h1 { font-size: 1.6rem; color: var(--navy); font-weight: 800; line-height: 1.15; }
+.header .sub { font-size: 0.9rem; color: var(--ink-soft); margin-top: 4px; }
+
+/* Banners */
+.warning, .info-banner {
+  border-left: 4px solid;
+  padding: 0.85rem 1.25rem;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+  font-size: 0.92rem;
+}
+.warning { background: var(--warn-bg); border-color: var(--warn-border); color: var(--warn-ink); }
+.info-banner { background: var(--info-bg); border-color: var(--info-ink); color: var(--info-ink); }
+.warning strong, .info-banner strong { display: block; margin-bottom: 4px; font-size: 0.95rem; }
+
+/* Panels */
+.panel {
+  background: var(--bg-card);
+  border: 1px solid var(--rule);
+  border-radius: 10px;
+  padding: 1.25rem 1.5rem;
+  margin-bottom: 1rem;
+}
+.panel h2 {
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-soft);
+  margin-bottom: 0.9rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--rule);
+}
+
+/* Mode toggle */
+.mode-toggle {
+  display: inline-flex;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 1rem;
+}
+.mode-toggle button {
+  background: var(--bg-card);
+  border: none;
+  padding: 0.55rem 1.4rem;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+  font-family: inherit;
+  transition: all 0.15s;
+}
+.mode-toggle button.active {
+  background: var(--navy);
+  color: white;
+}
+.mode-toggle button:hover:not(.active) { background: var(--bg-elevated); color: var(--ink); }
+.mode-toggle button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Form */
+.form-row { display: flex; gap: 1rem; margin-bottom: 0.85rem; flex-wrap: wrap; }
+.form-row .form-field { flex: 1; min-width: 220px; }
+.form-field label {
+  display: block;
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-mute);
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+input[type="text"], input[type="password"], input[type="number"] {
+  width: 100%;
+  padding: 0.55rem 0.85rem;
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.95rem;
+}
+input[type="text"]:focus, input[type="password"]:focus, input[type="number"]:focus {
+  outline: none;
+  border-color: var(--navy);
+  box-shadow: 0 0 0 3px rgba(30, 58, 95, 0.12);
+}
+input:disabled { background: var(--bg-elevated); opacity: 0.7; cursor: not-allowed; }
+.algo-display {
+  display: inline-block;
+  padding: 0.35rem 0.85rem;
+  background: var(--navy-soft);
+  color: var(--navy);
+  border-radius: 6px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  font-family: ui-monospace, monospace;
+}
+.field-hint { font-size: 0.78rem; color: var(--ink-mute); margin-top: 4px; font-style: italic; }
+.solo-warn {
+  background: var(--warn-bg); border-left: 3px solid var(--warn-border);
+  padding: 0.6rem 0.85rem; border-radius: 4px; color: var(--warn-ink);
+  font-size: 0.85rem; margin-bottom: 0.85rem;
+}
+
+/* Buttons */
+.btn {
+  padding: 0.6rem 1.4rem;
+  border: 1px solid var(--rule);
+  background: var(--bg-card);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: 600;
+  font-family: inherit;
+  color: var(--ink);
+  transition: all 0.15s;
+}
+.btn:hover:not(:disabled) { background: var(--navy-soft); border-color: var(--navy); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-primary { background: var(--navy); color: white; border-color: var(--navy); }
+.btn-primary:hover:not(:disabled) { background: #122947; }
+.controls { display: flex; gap: 0.5rem; }
+
+/* Status pill */
+.status-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  margin-bottom: 1rem;
+}
+.status-pill {
+  display: inline-block;
+  padding: 0.3rem 0.85rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  background: var(--bg-elevated);
+  color: var(--ink-soft);
+  font-family: ui-monospace, monospace;
+}
+.status-pill.status-idle, .status-pill.status-disconnected { background: var(--bg-elevated); color: var(--ink-mute); }
+.status-pill.status-connecting { background: var(--info-bg); color: var(--info-ink); }
+.status-pill.status-connected { background: var(--info-bg); color: var(--info-ink); }
+.status-pill.status-authorized { background: var(--ok-soft); color: var(--ok); }
+.status-pill.status-mining { background: var(--ok-soft); color: var(--ok); }
+.status-pill.status-error { background: rgba(185, 28, 28, 0.1); color: var(--bad); }
+
+/* Stats grid */
+.stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.85rem;
+}
+.stat {
+  background: var(--bg-soft);
+  border-radius: 8px;
+  padding: 0.8rem 1rem;
+}
+.stat-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-mute);
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.stat-value {
+  font-size: 1.2rem;
+  font-weight: 700;
+  font-family: ui-monospace, monospace;
+  color: var(--ink);
+  word-break: break-all;
+}
+.stat-note {
+  font-size: 0.7rem;
+  color: var(--warn-ink);
+  margin-top: 4px;
+  font-style: italic;
+}
+
+/* Log */
+.log-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
+.log-list {
+  max-height: 320px;
+  overflow-y: auto;
+  background: var(--bg-elevated);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.8rem;
+}
+.log-empty { padding: 1rem; color: var(--ink-mute); font-style: italic; text-align: center; font-family: inherit; }
+.log-row { display: grid; grid-template-columns: 70px 50px 1fr; gap: 0.65rem; padding: 0.25rem 0; border-bottom: 1px solid var(--rule); align-items: baseline; }
+.log-row:last-child { border-bottom: none; }
+.log-time { color: var(--ink-mute); font-size: 0.75rem; }
+.log-kind {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-align: center;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: var(--bg-card);
+  text-transform: uppercase;
+}
+.log-info { color: var(--info-ink); background: var(--info-bg); }
+.log-ok { color: var(--ok); background: var(--ok-soft); }
+.log-warn { color: var(--warn-ink); background: var(--warn-bg); }
+.log-error { color: var(--bad); background: rgba(185,28,28,0.1); }
+.log-tx { color: var(--ink-soft); background: var(--bg-elevated); }
+.log-rx { color: var(--navy); background: var(--navy-soft); }
+.log-text { color: var(--ink); word-break: break-all; }
+
+/* Credit line (between stats and log) */
+.credit-line {
+  text-align: center;
+  font-style: italic;
+  color: var(--ink-soft);
+  font-size: 0.92rem;
+  padding: 0.85rem 1rem;
+  margin-bottom: 1rem;
+  background: var(--navy-soft);
+  border-radius: 8px;
+  font-family: "Georgia", "Times New Roman", serif;
+}
+
+/* Joel's pixel-art mining animation */
+.miner-anim {
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #1a1410;
+  margin-bottom: 0.4rem;
+}
+.miner-anim canvas {
+  display: block;
+  width: 100%;
+  height: 160px;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+.miner-anim-caption {
+  text-align: center;
+  font-style: italic;
+  color: var(--ink-soft);
+  font-size: 0.88rem;
+  padding: 0.4rem 1rem;
+  margin-bottom: 1rem;
+  font-family: "Georgia", "Times New Roman", serif;
+}
+
+/* Wallet panel (Your wallet section) */
+.addr-row { display: flex; gap: 0.5rem; align-items: stretch; }
+.addr-row input { flex: 1; }
+.btn-small {
+  padding: 0.4rem 0.85rem;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+.wallet-keys {
+  margin-top: 0.85rem;
+  border: 1px solid var(--rule);
+  border-radius: 8px;
+  background: var(--bg-soft);
+  padding: 1rem 1.25rem;
+}
+.wallet-keys.hidden { display: none; }
+.wallet-warn {
+  background: #fef2f2;
+  border-left: 4px solid var(--bad);
+  color: #7f1d1d;
+  padding: 0.7rem 1rem;
+  border-radius: 6px;
+  margin-bottom: 0.85rem;
+  font-size: 0.9rem;
+}
+.wallet-warn strong { display: block; margin-bottom: 4px; }
+.key-field { margin-bottom: 0.65rem; }
+.key-field label {
+  display: block;
+  font-size: 0.74rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--ink-mute);
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.key-value-row {
+  display: flex;
+  gap: 0.5rem;
+  align-items: stretch;
+}
+.key-value {
+  flex: 1;
+  background: var(--bg-card);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 0.88rem;
+  word-break: break-all;
+  user-select: all;
+}
+.key-value.secret { border-color: #fca5a5; background: #fef2f2; color: #7f1d1d; }
+.wallet-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-top: 0.85rem; }
+.explorer-help {
+  background: var(--info-bg);
+  border-left: 4px solid var(--info-ink);
+  color: var(--info-ink);
+  padding: 0.7rem 1rem;
+  border-radius: 6px;
+  margin-top: 0.85rem;
+  font-size: 0.88rem;
+}
+.explorer-help strong { display: block; margin-bottom: 4px; }
+.explorer-help a {
+  color: var(--info-ink);
+  font-weight: 700;
+  text-decoration: underline;
+}
+.explorer-help ol { margin: 0.35rem 0 0 1.25rem; }
+.explorer-help li { margin-bottom: 0.25rem; }
+.copied-flash {
+  font-size: 0.78rem;
+  color: var(--ok);
+  margin-left: 0.5rem;
+  font-style: italic;
+}
+
+/* Footer */
+.footer {
+  text-align: center;
+  color: var(--ink-mute);
+  font-size: 0.82rem;
+  margin-top: 1.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--rule);
+}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header class="header">
+    <img class="coin" src="data:image/png;base64,{{COIN_B64}}" alt="BadCoin">
+    <div class="header-text">
+      <h1>BadCoin HTML Miner</h1>
+      <div class="sub">Mine BAD from your browser. Yescrypt only. Pool mining. 100% client-side.</div>
+    </div>
+  </header>
+
+  <div class="info-banner">
+    <strong>Performance expectations.</strong>
+    Browser yescrypt runs at ~500&ndash;700 H/s per thread on Apple Silicon, ~50&ndash;200 H/s on older / non-ARM hardware. With multiple workers, total throughput is a few KH/s per machine. That is not competitive with native CPU miners, let alone the wider network. This is a community / learning / onboarding device, not a profit center. Expected earnings are small. The point is the experience: "I mined BAD from a browser tab."
+  </div>
+
+  <div class="info-banner" style="background: #f0f4f8; border-color: #94a3b8; color: #475569;">
+    <strong>Why no solo mode?</strong>
+    Solo mining at browser hashrate against the BadCoin network's full difficulty means expected time to find a block is years to never. For real solo mining, use the BadCoin Core wallet's Mining tab: native code, full CPU hashrate, connects directly to your own <code>badcoind</code>. This browser tool is pool-only by design.
+  </div>
+
+  <div class="status-bar">
+    <span class="status-pill status-idle" id="statusPill">IDLE</span>
+    <span class="controls">
+      <button id="btnStart" class="btn btn-primary">▶ Start mining</button>
+      <button id="btnStop" class="btn" disabled>■ Stop</button>
+    </span>
+  </div>
+
+  <section class="panel">
+    <h2>Pool connection</h2>
+    <div class="form-row">
+      <div class="form-field">
+        <label for="poolUrl">Pool URL (wss://)</label>
+        <input id="poolUrl" type="text" value="wss://pool.badcoin.dev" spellcheck="false" autocomplete="off">
+        <div class="field-hint">Must be a stratum-over-WebSocket endpoint. Browsers cannot open raw TCP.</div>
+      </div>
+      <div class="form-field">
+        <label for="walletAddress">BAD payout address</label>
+        <div class="addr-row">
+          <input id="walletAddress" type="text" placeholder="B..." spellcheck="false" autocomplete="off">
+          <button id="btnGenerateAddress" class="btn btn-small" type="button" title="Generate a fresh BadCoin keypair in your browser">+ New</button>
+        </div>
+        <div class="field-hint">Your BadCoin address. Earnings get paid here per the pool's payout policy. Have no address yet? Click <strong>+ New</strong> to make one in the browser.</div>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-field">
+        <label for="workerName">Worker name</label>
+        <input id="workerName" type="text" value="browser-1" spellcheck="false" autocomplete="off">
+        <div class="field-hint">Becomes <code>address.worker</code> in the stratum auth username.</div>
+      </div>
+      <div class="form-field">
+        <label for="threadsInput">Threads</label>
+        <input id="threadsInput" type="number" min="1" max="32" value="4">
+        <div class="field-hint">Number of WebWorkers (one CPU thread each). Yescrypt is memory-hard; more threads than physical cores gives diminishing returns. Default is half your CPU thread count.</div>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-field">
+        <label>Algorithm</label>
+        <div><span class="algo-display">YESCRYPT</span> <span class="field-hint" style="display:inline; margin-left:0.5rem;">BSTY variant, N=2048, r=8, p=1. BadCoin's other four algorithms (Scrypt, Groestl, Skein, SHA-256d) are not supported in this browser miner.</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Your wallet</h2>
+    <p style="font-size: 0.9rem; color: var(--ink-soft); margin-bottom: 0.85rem;">
+      Mining pays out to a BadCoin address that you own. You can paste an address you already have into the field above, or click <strong>+ New</strong> to generate a fresh keypair right in your browser. Generation is 100% client-side: no keys ever leave this page.
+    </p>
+
+    <div id="walletKeys" class="wallet-keys hidden">
+      <div class="wallet-warn">
+        <strong>Save this private key right now.</strong>
+        We do not store it anywhere. Refresh this page or close this tab, and it is gone. Lose the private key and the BAD sent to this address is gone forever. Anyone who sees the private key can spend the coins.
+      </div>
+
+      <div class="key-field">
+        <label>Address (share freely)</label>
+        <div class="key-value-row">
+          <div id="walletAddrOut" class="key-value">—</div>
+          <button class="btn btn-small" type="button" data-copy="walletAddrOut">Copy</button>
+        </div>
+      </div>
+
+      <div class="key-field">
+        <label>Private key (WIF) — keep secret</label>
+        <div class="key-value-row">
+          <div id="walletWifOut" class="key-value secret">—</div>
+          <button class="btn btn-small" type="button" data-copy="walletWifOut">Copy</button>
+        </div>
+      </div>
+
+      <div class="key-field">
+        <label>Public key (compressed hex)</label>
+        <div class="key-value-row">
+          <div id="walletPubOut" class="key-value">—</div>
+          <button class="btn btn-small" type="button" data-copy="walletPubOut">Copy</button>
+        </div>
+      </div>
+
+      <div class="wallet-actions">
+        <button id="btnDownloadPdf" class="btn btn-primary" type="button">Save paper wallet (PDF with QR codes)</button>
+        <button id="btnDownloadWallet" class="btn" type="button">Download backup (.txt)</button>
+        <a id="explorerLinkAddr" class="btn" href="https://explorer.badcoin.dev/" target="_blank" rel="noopener noreferrer">Look up this address on the explorer</a>
+      </div>
+      <p style="font-size: 0.82rem; color: var(--ink-mute); margin-top: 0.6rem; font-style: italic;">
+        Tip: the PDF includes scannable QR codes for both the address and the private key. Open the BadCoin iPhone wallet's import / scan feature and point it at the WIF QR code to load this address onto your phone.
+      </p>
+    </div>
+
+    <div class="explorer-help">
+      <strong>Check your balance and transactions</strong>
+      Open the BadCoin block explorer in a new tab, paste your address into the search box, and the explorer shows your current balance and full transaction history.
+      <ol>
+        <li>Open <a href="https://explorer.badcoin.dev/" target="_blank" rel="noopener noreferrer">https://explorer.badcoin.dev/</a> in a new tab.</li>
+        <li>Paste your BadCoin address (the one starting with <code>B</code>) into the explorer's search box.</li>
+        <li>Read off your current balance and the full transaction history on the resulting page.</li>
+      </ol>
+    </div>
+  </section>
+
+  <div class="miner-anim">
+    <canvas id="badcoin-miner-canvas" width="900" height="160"></canvas>
+  </div>
+  <div class="miner-anim-caption">Joel's little HTML miner</div>
+
+  <section class="panel">
+    <h2>Stats</h2>
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-label">Hashrate</div>
+        <div class="stat-value" id="hashrate">0 H/s</div>
+        <div class="stat-note" id="hashrate-note">idle</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Difficulty</div>
+        <div class="stat-value" id="difficulty">—</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Current job</div>
+        <div class="stat-value" id="currentJob">—</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Uptime</div>
+        <div class="stat-value" id="uptime">—</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Shares accepted</div>
+        <div class="stat-value" id="sharesAccepted">0</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Shares rejected</div>
+        <div class="stat-value" id="sharesRejected">0</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Submitted</div>
+        <div class="stat-value" id="sharesSubmitted">0</div>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel">
+    <div class="log-toolbar">
+      <h2 style="margin: 0; padding: 0; border: 0;">Event log</h2>
+      <button id="btnClearLog" class="btn" style="padding: 0.3rem 0.75rem; font-size: 0.8rem;">Clear</button>
+    </div>
+    <div class="log-list" id="logList"></div>
+  </section>
+
+  <div class="footer">
+    BadCoin HTML Miner v0.2 · real yescrypt hashing via WASM · runs entirely in your browser · for the BadCoin community
+  </div>
+
+</div>
+
+<!-- Inlined source for the WebWorker bundle.
+     The worker is built at runtime from these strings via Blob URLs so the
+     whole miner stays a single HTML file with no separate .wasm or .js
+     dependencies. -->
+<script id="src-yescrypt-inline" type="text/plain">
+{{YESCRYPT_INLINE_JS}}
+</script>
+<script id="src-yescrypt-wrapper" type="text/plain">
+{{YESCRYPT_WRAPPER_JS}}
+</script>
+<script id="src-miner-worker" type="text/plain">
+{{MINER_WORKER_JS}}
+</script>
+
+<!-- Main-thread crypto + paper-wallet libraries for in-browser keypair generation.
+     secp256k1 (elliptic.js), SHA-256 (js-sha256), QR codes (qrcode-generator),
+     PDF output (jsPDF). Used only by the "+ New" address button and the paper
+     wallet exports; nothing here makes any network calls. -->
+<script>
+{{SHA256_MIN_JS}}
+</script>
+<script>
+{{ELLIPTIC_MIN_JS}}
+</script>
+<script>
+{{QRCODE_MIN_JS}}
+</script>
+<script>
+{{JSPDF_MIN_JS}}
+</script>
+
+<!-- Joel's pixel-art mining animation (canvas above the Stats panel). -->
+<script>
+{{JOEL_MINER_ANIM_JS}}
+</script>
+
+<script>
+{{APP_JS}}
+</script>
+</body>
+</html>
